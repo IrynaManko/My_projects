@@ -1,0 +1,82 @@
+--Вибираємо необхідні дані з бази даних
+
+select ad_date ,
+		spend ,
+		clicks,
+		spend/clicks as CPC --вартість одного кліка
+from facebook_ads_basic_daily fabd 
+where clicks > 0
+order by ad_date desc;
+
+--------------------------------------------------------------------------------------
+--Вибираємо необхідні дані та рахуємо метрики CPC, CPM, CTR, ROMI
+
+select ad_date ,
+		campaign_id ,
+		sum(spend) as amout_ad_spend,
+		sum (impressions)as cnt_impressions,
+		sum(clicks) as sum_clics,
+		sum(value) as amount_value,
+		round(sum (spend)::numeric /sum (clicks),2)as CPC,
+		round( (sum (spend)::numeric/sum(impressions)*1000),2) as CPM,
+		round ((sum(clicks)::numeric/sum (impressions)*100),1) as CTR, --%
+		round(sum(value)::numeric /sum (spend),2) as ROMI
+from  facebook_ads_basic_daily fabd 
+group by ad_date , 
+		campaign_id 
+having campaign_id is not null and sum(clicks)>0
+;
+
+-------------------------------------------------------------------------------------------
+--Серед кампаній з загальною сумою витрат більше 500 000 знаходимо кампанію з найвищим ROMI
+
+select campaign_id 
+from facebook_ads_basic_daily fabd
+group by campaign_id 
+having campaign_id is not null and sum (spend)>500000 
+order by round( sum(value) :: numeric /sum (spend),2) desc
+limit 1;
+
+---------------------------------------------------------------------------------------------
+Поєднуємо дві таблиці використовуючи union та отримуємо необхідні нам дані
+
+with all_data_ad as (
+	select   
+	        ad_date,
+			'Facebook Ads' as media_source,
+			sum(spend) as spend_sum,
+			sum (impressions)as impressions_sum,
+			sum (reach) as reach_sum,
+			sum (clicks) as clicks_sum,
+			sum (leads) as leads_sum,
+			sum(value) as value_sum 
+	From facebook_ads_basic_daily fabd
+	where ad_date is not null
+	group by ad_date
+	union
+	select  
+	          ad_date,
+			  'Google Ads' as media_source,
+			 sum(spend) as spend_sum,
+			sum (impressions)as impressions_sum,
+			sum (reach) as reach_sum,
+			sum (clicks) as clicks_sum,
+			sum (leads) as leads_sum,
+			sum(value) as value_sum 
+	from google_ads_basic_daily 
+	where ad_date is not null
+	group by ad_date
+	)
+ select ad_date , 
+		media_source,
+		sum(spend_sum) as spend_sum,
+		sum (impressions_sum) as impressions_sum,
+		sum (clicks_sum) as clicks_sum,
+		sum(value_sum) as value_sum 
+from all_data_ad
+group by ad_date, media_source
+;
+
+------------------------------------------------------------------------------------------
+
+
